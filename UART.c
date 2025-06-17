@@ -8,6 +8,13 @@
 
 #define TX_PIN 2
 #define RX_PIN 3
+#define TX_BUF_SIZE 128
+#define RX_BUF_SIZE 128
+
+volatile uint8_t tx_buffer[TX_BUF_SIZE];
+volatile uint8_t rx_buffer[RX_BUF_SIZE];
+volatile uint32_t tx_head = 0, tx_tail = 0;	//make a ring buffer
+volatile uint32_t rx_head = 0, rx_tail = 0;	
 
 void UART2_Init(void) {
 	// Enable the clock of USART 1 & 2
@@ -24,8 +31,8 @@ void UART2_Init(void) {
 	UART2_GPIO_Init();
 	USART_Init(USART2);
 	
-	//NVIC_SetPriority(USART2_IRQn, 0);			// Set Priority to 1
-	//NVIC_EnableIRQ(USART2_IRQn);					// Enable interrupt of USART1 peripheral
+	NVIC_SetPriority(USART2_IRQn, 0);			// Set Priority to 1
+	NVIC_EnableIRQ(USART2_IRQn);					// Enable interrupt of USART2 peripheral
 }
 
 void UART2_GPIO_Init(void) {
@@ -62,7 +69,7 @@ void USART_Init (USART_TypeDef * USARTx) {
 	
 	// Configure oversampling mode: Oversampling by 16 
 	USARTx->CR1 &= ~USART_CR1_OVER8;  // 0 = oversampling by 16, 1 = oversampling by 8
-	
+ 	
 	// Configure stop bits to 1 stop bit
 	//   00: 1 Stop bit;      01: 0.5 Stop bit
 	//   10: 2 Stop bits;     11: 1.5 Stop bit
@@ -91,6 +98,8 @@ void USART_Init (USART_TypeDef * USARTx) {
 	if (USARTx == USART2){
 		USARTx->ICR |= USART_ICR_TCCF;
 		USART1->CR3 |= USART_CR3_DMAT | USART_CR3_DMAR;
+		USART2 ->CR1 |= USART_CR1_RXNEIE;	//enable read data register is not empty interrupt
+		
 	}
 	
 	USARTx->CR1  |= USART_CR1_UE; // USART enable                 
@@ -99,7 +108,7 @@ void USART_Init (USART_TypeDef * USARTx) {
 	while ( (USARTx->ISR & USART_ISR_REACK) == 0); // Verify that the USART is ready for transmission
 }
 
-
+/*
 uint8_t USART_Read (USART_TypeDef * USARTx) {
 	// SR_RXNE (Read data register not empty) bit is set by hardware
 	while (!(USARTx->ISR & USART_ISR_RXNE));  // Wait until RXNE (RX not empty) bit is set
@@ -107,7 +116,15 @@ uint8_t USART_Read (USART_TypeDef * USARTx) {
 	return ((uint8_t)(USARTx->RDR & 0xFF));
 	// Reading USART_DR automatically clears the RXNE flag 
 }
+*/
+uint8_t USART_Read (USART_TypeDef * USARTx) {
+    while (rx_head == rx_tail); // ?? ??? ? ??? ??
+    uint8_t ch = rx_buffer[rx_tail];
+    rx_tail = (rx_tail + 1) % RX_BUF_SIZE;
+    return ch;
+}
 
+/*
 void USART_Write(USART_TypeDef * USARTx, uint8_t *buffer, uint32_t nBytes) {
 	int i;
 	// TXE is cleared by a write to the USART_DR register.
@@ -123,7 +140,17 @@ void USART_Write(USART_TypeDef * USARTx, uint8_t *buffer, uint32_t nBytes) {
 	// USARTx->ISR &= ~USART_ISR_TC;
 	USARTx->ICR &= ~USART_ICR_TCCF; // Write 1 to clear the TC flag
 }   
- 
+*/
+void USART_Write(USART_TypeDef * USARTx, uint8_t *buffer, uint32_t nBytes) {
+  uint32_t i;
+	for (i = 0; i < nBytes; i++) {
+        uint32_t next_head = (tx_head + 1) % TX_BUF_SIZE;
+        while (next_head == tx_tail); // wait if buffer is full (Blocking)
+        tx_buffer[tx_head] = buffer[i];
+        tx_head = next_head;
+    }
+    USARTx->CR1 |= USART_CR1_TXEIE; // TXE interrupt Enable
+}
 
 void USART_Delay(uint32_t us) {
 	uint32_t time = 100*us/7;    
@@ -150,4 +177,34 @@ void USART_IRQHandler(USART_TypeDef * USARTx, uint8_t *buffer, uint32_t * pRx_co
 		while(1);     
 	}	
 }
+
+
+void USART2_IRQHandler(void) {
+    // RX interrupt
+    if (USART2->ISR & USART_ISR_RXNE) {
+        uint8_t ch = USART2->RDR;
+        uint32_t next_head = (rx_head + 1) % RX_BUF_SIZE;
+        if (next_head != rx_tail) {  // overflow ??
+            rx_buffer[rx_head] = ch;
+            rx_head = next_head;
+        }
+    }
+
+    // TX interrupt
+    if (USART2->ISR & USART_ISR_TXE) {
+        if (tx_head == tx_tail) {
+            USART2->CR1 &= ~USART_CR1_TXEIE; // Disable TXE interrupt
+        } else {
+            USART2->TDR = tx_buffer[tx_tail];
+            tx_tail = (tx_tail + 1) % TX_BUF_SIZE;
+        }
+    }
+
+    // Error interrupts
+    if (USART2->ISR & USART_ISR_ORE) USART2->ICR = USART_ICR_ORECF;
+    if (USART2->ISR & USART_ISR_FE)  USART2->ICR = USART_ICR_FECF;
+    if (USART2->ISR & USART_ISR_NE)  USART2->ICR = USART_ICR_NCF;
+    if (USART2->ISR & USART_ISR_PE)  USART2->ICR = USART_ICR_PECF;
+}
+
 

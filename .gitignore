@@ -5,10 +5,15 @@
 .map
 .lst
 .a
+.dep
+.htm
 
 .uvprojx
 .uvoptx
 .cproject
 .vscode
 .idea
+.jinyo
+.GACHON
+.scvd
 

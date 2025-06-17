@@ -4,14 +4,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* ? ??? ?? ????? */
-#define RB_SIZE 128          // ?? ??(=?? ??? ??? ?)
+//Ring buffer size
+#define RB_SIZE 128          
 
-/* ? ?? ??? */
+/* Ring buffer struct */
 typedef struct {
     uint8_t buf[RB_SIZE];
-    volatile uint16_t head;  // ??? ? ??
-    volatile uint16_t tail;  // ??? ?? ??
+    volatile uint16_t head;  
+    volatile uint16_t tail;  
 } RingBuffer;
 
 /* API */
@@ -20,9 +20,9 @@ bool     rb_is_empty(const RingBuffer *rb);
 bool     rb_is_full (const RingBuffer *rb);
 uint16_t rb_size    (const RingBuffer *rb);
 
-bool     rb_push    (RingBuffer *rb, uint8_t byte);   // 1??? ??
-bool     rb_pop     (RingBuffer *rb, uint8_t *byte);  // 1??? ??
-bool     rb_peek    (RingBuffer *rb, uint8_t *byte);  // ?? ?? X
-void     rb_flush   (RingBuffer *rb);                 // ?? ???
+bool     rb_push    (RingBuffer *rb, uint8_t byte);    
+bool     rb_pop     (RingBuffer *rb, uint8_t *byte);  
+bool     rb_peek    (RingBuffer *rb, uint8_t *byte);  
+void     rb_flush   (RingBuffer *rb);                 
 
 #endif /* RING_BUFFER_H */

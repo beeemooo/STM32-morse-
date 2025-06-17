@@ -4,9 +4,12 @@
 #include "UART.h"
 #include "SysTimer.h"
 
+#include "ring_buffer.h"
 #include <string.h>
 #include <stdio.h>
 #include "Char_to_Morse.h"
+
+#define MAX_MSG_LEN 255          // maximum input length
 
 char RxComByte = 0;
 uint8_t buffer[BufferSize];		//It is 32
@@ -27,24 +30,60 @@ void demo_of_printf_scanf(){	//
 }
 */
 
+/*
 void UART_input_handler(){	//
-	char rxByte[100];
+	char rxByte[256];
 	printf("Give sentence to print in morse then press enter:\r\n");
-	scanf ("%[^\n]%*c", &rxByte);
+	//scanf ("%255[^\n]%*c", rxByte);
+	scanf("%255[^\r]%*c", rxByte);  
+
+	printf("processing morse code");
+	send_morse_string(rxByte);
 	
-	if (rxByte == '1'){
-		LED_On();
-		delay(1000);
-		LED_Off();
-		
-	}
-	else if (rxByte == '2'){
-		LED_On();
-		delay(2000);
-		LED_Off();
-		
-	}
-	printf("LED is Off\r\n\r\n");
+	printf("DONE\r\n\r\n");
+}
+*/
+
+
+void UART_input_handler(void)
+{
+    char msg[MAX_MSG_LEN + 1];   // +1 byte space for null terminating
+    uint16_t idx = 0;
+
+    printf("Give sentence to print in morse then press enter:\r\n");
+
+    /* === receiving === */
+    while (1)
+    {
+        int ch = getchar();          
+        if (ch == '\r' || ch == '\n') {
+            //change line
+            putchar('\r');
+            putchar('\n');
+            msg[idx] = '\0';         // terminating string
+            break;
+        }
+
+        /* bacspace logic */
+        if ((ch == 0x08 || ch == 0x7F) && idx > 0) {
+            --idx;
+            /* removing char at terminal */
+            putchar('\b'); putchar(' '); putchar('\b');
+            continue;
+        }
+
+        /* save char in morse buffer */
+        if (idx < MAX_MSG_LEN) {
+            msg[idx++] = (char)ch;
+            putchar(ch);             // echo string
+        }
+        //if buffer is full, ignore the input
+    }
+
+    /* === 2. process morse === */
+    printf("\r\nprocessing morse code...\r\n");
+    send_morse_string(msg);          // convert string to morse code
+    printf("DONE\r\n\r\n");
 }
 
 /*
@@ -71,25 +110,26 @@ void UART_print_Done(void){
 }
 
 int main(void){
-	int a;
-	char b[] = "Done";
+	
+	
 	
 	System_Clock_Init(); // Switch System Clock = 80 MHz
 	SysTick_Init();
 	LED_Init();
 	UART2_Init();
 	
-	a = 0;
-	while (1){
-		/*
-		LED_Off();
-		UART_led_controller();
-		UART_print_Done();
-		a++;
-		*/
-		send_morse_string("HELLO WORLD");
-    unit_delay(14);
-		
-	}
+	volatile uint32_t * debug_odr = &(GPIOA -> ODR);
+
+    printf("\r\n--- STM32 Morse Echo Demo ---\r\n");
+
+    
+    while (1)
+    {
+				
+        UART_input_handler();  // processing morse code
+        unit_delay(14);        // delay after processing entire sentence
+    }
+
 }
+
 
