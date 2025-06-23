@@ -1,12 +1,16 @@
-# 🔤 STM32 Morse Code via UART
+#  STM32 Morse Code via UART
 
 This project implements a Morse code transmitter using STM32 microcontroller, UART interrupt mechanism, and LED signal output. The system converts input text from the PC terminal into Morse code, and then generates LED blinking patterns according to Morse timing specifications.
 
 >  This project demonstrates UART communication, ring buffer management, and real-time Morse code interpretation using embedded C.
 
+
+
 ---
 
-## 📦 Features
+
+
+##  Features
 
 - **UART RX/TX interrupt-based communication**
 - **Ring buffer implementation** for both UART and Morse code processing
@@ -15,7 +19,11 @@ This project implements a Morse code transmitter using STM32 microcontroller, UA
 - Terminal feedback: `Processing morse code...` and `DONE` message
 - **Debug print support** and waveform generation with Python plotting
 
+
+
 ---
+
+
 
 ##  System Architecture
 
